@@ -24,10 +24,10 @@ def main():
 
     parameter_product = True
     parameter_per_recommender = False
-    percentages = [20, 30, 40, 60, 80, 95]
-    alphas = [0.3, 0.5, 0.9]
+    percentages = [5, 20, 30, 40, 60, 80, 95]
+    alphas = [0.1, 0.4, 0.7, 0.9]
     ranks = [100, 200, 400]
-    degs = [-1.5, -0.5, 0.0, 0.5]
+    degs = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5]
 
     CF_recommender_classes = [
         PureSVDItemRecommender
