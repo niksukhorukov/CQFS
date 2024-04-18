@@ -5,21 +5,22 @@ from recsys.Recommender_import_list import (
     ItemKNNCFRecommender, PureSVDItemRecommender, RP3betaRecommender,
 )
 
-from core.mkl import mkl_set_num_threads
 
 
 def main():
-    num_threads = 12
-    mkl_set_num_threads(num_threads)
     data_loader = CiteULike_aLoader()
     ICM_name = 'ICM_title_abstract'
 
     parameter_product = True
     parameter_per_recommender = False
-    percentages = [5, 20, 30, 40, 60, 80, 95]
-    alphas = [0.1, 0.4, 0.7, 0.9]
-    ranks = [100, 200, 400]
-    degs = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5]
+    # percentages = [5, 20, 30, 40, 60, 80, 95]
+    # alphas = [0.1, 0.4, 0.7, 0.9]
+    # ranks = [100, 200, 400]
+    # degs = [-2.0, -1.5, -1.0, -0.5, 0.0, 0.5]
+    percentages = [60]
+    alphas = [0.9]
+    ranks = [400]
+    degs = [0.0]
 
     CF_recommender_classes = [
         PureSVDItemRecommender,

@@ -4,21 +4,18 @@ from experiments.train_CQFSHSVD import train_CQFSHSVD
 from recsys.Recommender_import_list import (
     ItemKNNCFRecommender, PureSVDItemRecommender, RP3betaRecommender,
 )
-
-from core.mkl import mkl_set_num_threads
-
 def main():
-    num_threads = 20
-    mkl_set_num_threads(num_threads)
     data_loader = XingChallenge2017Loader()
     ICM_name = 'ICM_all'
 
     parameter_product = True
     parameter_per_recommender = False
-    percentages = [40, 60, 80, 95]
-    alphas = [0.4, 0.7, 0.9]
-    ranks = [100, 200]
-    degs = [-1.5, -0.5, 0.5]
+    percentages = [5, 20, 40, 60, 80, 95]
+    alphas = [0.9, 0.7, 0.5, 0.3, 0.1]
+    ranks = [5, 20, 40, 60]
+    # degs = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0]
+    # degs = [-1.5, -0.5, 0.5]
+    degs = [-1.0, 0.0, 1.0]
 
     CF_recommender_classes = [
         PureSVDItemRecommender,

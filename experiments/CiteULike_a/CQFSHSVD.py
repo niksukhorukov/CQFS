@@ -5,11 +5,7 @@ from recsys.Recommender_import_list import (
     ItemKNNCFRecommender,PureSVDItemRecommender, RP3betaRecommender,
 )
 
-from core.mkl import mkl_set_num_threads
-
 def main():
-    num_threads = 12
-    mkl_set_num_threads(num_threads)
     data_loader = CiteULike_aLoader()
     ICM_name = 'ICM_title_abstract'
 

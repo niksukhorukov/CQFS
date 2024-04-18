@@ -123,7 +123,7 @@ def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_start
     dataIO.save_data("timings", timings)
     dataIO.save_data("statistics", statistics)
 
-    percentages = [40, 60, 80, 95]
+    percentages = [5, 20, 40, 60, 80, 95]
 
     if parallelize:
         args = [(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation, evaluator_test,

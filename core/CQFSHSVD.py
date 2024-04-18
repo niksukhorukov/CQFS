@@ -8,6 +8,7 @@ from utils.naming import get_experiment_id
 from utils.statistics import similarity_statistics, BQM_statistics
 from scipy.linalg import cholesky
 from scipy.sparse.linalg import svds
+from scipy.sparse import diags
 
 from core.maxvol import maxvol_rect
 
@@ -174,36 +175,21 @@ class CQFSHSVD:
         response_time = time.time()
 
         max_k = int(self.__p_to_k(max(ps), self.n_features))
-        popularity = np.diag(
-        (
-            self.URM_train.T.dot(self.URM_train)
-        ).A
-        )
-        popularity.setflags(write=1)
-        # popularity[popularity == 0.0] = 1.0
-        popularity_time = time.time() - response_time
-        print('popularity time', popularity_time)
-        response_time1 = time.time()
-        
-        
-        # print(np.sum(popularity == 0.0))
+
+        popularity = np.array(self.URM_train.sum(axis=0)).squeeze()
         popularity[popularity == 0.0] = 1.0
-        popularity.setflags(write=0)
         popularity = popularity ** deg_inv
-        sim = self.URM_train.A * popularity
+        sim = self.URM_train @ diags(popularity)
         
-        # sim = self.URM_train.A
-        sim_time = time.time() - response_time1
-        print('sim time', sim_time)
-        response_time1 = time.time()
-        S_collab = sim.T.dot(sim)
+        S_collab = (sim.T.dot(sim)).A
         S_collab = S_collab / np.max(S_collab)
         S_collab = S_collab - np.diag(np.diag(S_collab)) + np.eye(S_collab.shape[0])
         S_maxvol = (1 - alpha_inv) * np.eye(S_collab.shape[0]) + alpha_inv * S_collab
-        t4_time = time.time() - response_time1
+        t4_time = time.time() - response_time
         print('S preparation', t4_time)
+        print('S shape', S_maxvol.shape)
         response_time1 = time.time()
-        L_S_maxvol = cholesky(S_maxvol, lower=True)
+        L_S_maxvol = np.linalg.cholesky(S_maxvol)
         ls_time = time.time() - response_time1
         print('cholesky time', ls_time)
         response_time1 = time.time()

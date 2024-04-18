@@ -5,26 +5,23 @@ from recsys.Recommender_import_list import (
     ItemKNNCFRecommender, PureSVDItemRecommender, RP3betaRecommender,
 )
 
-from core.mkl import mkl_set_num_threads
-
 
 def main():
-    num_threads = 20
-    mkl_set_num_threads(num_threads)
     data_loader = TheMoviesDatasetLoader()
     ICM_name = 'ICM_metadata'
 
     parameter_product = True
     parameter_per_recommender = False
     percentages = [5, 10, 20, 30, 40, 60, 80, 95]
-    alphas = [0.4, 0.7, 0.9]
-    ranks = [100, 200]
-    degs = [-1.5, -0.5, 0.5]
+    # alphas = [0.9, 0.7, 0.5, 0.3, 0.1]
+    alphas = [0.3]
+    ranks = [100, 200, 400]
+    degs = [0.5, 1.0, 1.5, 2.0]
 
     CF_recommender_classes = [
         PureSVDItemRecommender,
     ]
-    sampler = CQFSHSVDSampler(rmax=4, evals=2e6)
+    sampler = CQFSHSVDSampler()
 
     cpu_count_div = 1
     cpu_count_sub = 0
