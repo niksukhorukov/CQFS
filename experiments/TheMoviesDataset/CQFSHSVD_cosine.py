@@ -15,7 +15,7 @@ def main():
     alphas = [0.8, 0.5, 0.2]
     ranks = [100, 200, 400]
     degs = [-1.0, -0.5, 0.0, 0.5, 1.0]
-    feature_weighting = 'tfidf'
+    feature_weighting = 'tfidf_collab_new'
 
     CF_recommender_classes = [
         PureSVDItemRecommender,

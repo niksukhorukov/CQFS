@@ -41,6 +41,17 @@ def run_CQFSHSVD_cosine(
     
     
     ICM_train_reweighted = ICM_train.copy()
+    if feature_weighting == 'tfidf_collab':
+        popularity = np.array(URM_train.sum(axis=0)).squeeze()
+        idf = np.log(ICM_train.shape[0] / (1.0 + np.array(ICM_train.sum(axis=0))).squeeze()) + 1.0
+        ICM_train_reweighted = diags(popularity) @ ICM_train @ diags(idf)
+        print('ICM tfidf_collab')
+    
+    if feature_weighting == 'tfidf_collab_new':
+        popularity = np.array(URM_train.sum(axis=0)).squeeze()
+        idf = np.log(ICM_train.shape[0] / (1.0 + np.array((diags(popularity) @ ICM_train).sum(axis=0))).squeeze()) + 1.0
+        ICM_train_reweighted = diags(popularity) @ ICM_train @ diags(idf)
+        print('ICM tfidf_collab_new')
     
     if feature_weighting == 'tfidf':
         idf = np.log(ICM_train.shape[0] / (1.0 + np.array(ICM_train.sum(axis=0))).squeeze()) + 1.0
