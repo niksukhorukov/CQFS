@@ -7,12 +7,15 @@ from recsys.Base.DataIO import DataIO
 from recsys.KNN.ItemKNNCFRecommender import ItemKNNCFRecommender
 from utils.sparse import merge_sparse_matrices
 from utils.statistics import warm_similarity_statistics
+from scipy.sparse import diags
+import numpy as np
 
 
 def run_CQFSHSVD_cosine(
         *, data_loader: DataLoader, ICM_name, percentages, alphas, ranks, degs,
         CF_recommender_classes, sampler, save_FPMs=False,
         parameter_product=True, parameter_per_recommender=False,
+        feature_weighting='tfidf'
 ):
     ##################################################
     # Data loading and splitting
@@ -34,6 +37,43 @@ def run_CQFSHSVD_cosine(
     ICM_train, original_ICM_train = data_loader.get_ICM_train_from_name(ICM_name, return_original=True)
     n_items, n_features = ICM_train.shape
     print(f"Training ICM has {n_items} items and {n_features} features.")
+    feature_to_index_mapper=data_loader.get_feature_to_index_mapper_from_name(ICM_name)
+    
+    
+    ICM_train_reweighted = ICM_train.copy()
+    
+    if feature_weighting == 'tfidf':
+        idf = np.log(ICM_train.shape[0] / (1.0 + np.array(ICM_train.sum(axis=0))).squeeze()) + 1.0
+        ICM_train_reweighted = ICM_train @ diags(idf)
+        print('ICM tfidf')
+    
+    
+    if ICM_name == 'ICM_metadata' and feature_weighting=='group':
+        feats = {
+            'ICM_metadata': ['genre_', 'production_company_', 'original_language_', 'release_date_', 'production_country_', 'spoken_lang_', 'collection_', 'ADULTS_', 'status_', 'status_', 'VIDEO_'],
+            # 'ICM_all': ['region_', 'industry_', 'discipline_', 'country_', 'employment_', 'is_paid_', 'career_level_'],
+            }
+
+        features_to_columns = {}
+        for key in feature_to_index_mapper:
+            for feature in feats[ICM_name]:
+                if key.startswith(feature):
+                    if feature not in features_to_columns:
+                        features_to_columns[feature] = []
+                    features_to_columns[feature].append(data_loader.get_feature_to_index_mapper_from_name(ICM_name)[key])
+                    
+        ICM_train_reweighted = ICM_train.copy()
+        for feature in features_to_columns:
+            indices = features_to_columns[feature]
+            feature_frequency = np.array(ICM_train[:, indices].sum(axis=1)).squeeze() ** 0.5
+            inverse = np.divide(
+                np.ones_like(feature_frequency),
+                feature_frequency,
+                out=np.ones_like(feature_frequency),
+                where=feature_frequency != 0.0)
+            ICM_train_reweighted[:, indices] = diags(feature_frequency ** -0.5) @ ICM_train_reweighted[:, indices]
+        print('ICM group')
+        
 
     ##################################################
     # Quantum Feature Selection
@@ -93,7 +133,7 @@ def run_CQFSHSVD_cosine(
         #                                         CBF_items_with_interactions=CBF_items_with_interactions)
 
         base_folder_path = f"../../results/{dataset_name}/{ICM_name}/{cf_recommender_name}/"
-        CQFS_selector = CQFSHSVD_cosine(ICM_train, URM_train, base_folder_path, sampler=sampler)
+        CQFS_selector = CQFSHSVD_cosine(ICM_train_reweighted, URM_train, base_folder_path, sampler=sampler)
 
         ##################################################
         # Perform CQFS
