@@ -12,9 +12,9 @@ from utils.recsys import test_ICM_feature_selection
 from utils.sparse import select_columns, merge_sparse_matrices
 
 
-def train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation, evaluator_test,
+def train_random_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation, evaluator_test,
                     URM_train, URM_train_last_test, ICM_train, ICM_train_last_test, n_cases, n_random_starts,
-                    similarity_type_list):
+                    similarity_type_list, seed):
     selection_time = time.time()
     k_features = round(n_features * percentage / 100)
     selection = IDF_argsort[:k_features]
@@ -28,7 +28,7 @@ def train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name,
     new_ICM_train_last_test = select_columns(ICM_train_last_test, bool_selection)
     test_ICM_feature_selection(new_ICM_train_last_test, bool_selection)
 
-    base_folder_path = f"../../results/{dataset_name}/{ICM_name}/TFIDF/p{percentage:03d}/"
+    base_folder_path = f"../../results/{dataset_name}/{ICM_name}/random_s{seed}/p{percentage:03d}/"
 
     selection_timings = {
         'selection_time': selection_time,
@@ -38,8 +38,8 @@ def train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name,
         'n_features': n_features,
         'k_percentage': percentage,
         'k_selected': len(selection),
-        'IDF_selection': selection,
-        'IDF_bool_selection': bool_selection,
+        'random_selection': selection,
+        'random_bool_selection': bool_selection,
     }
 
     dataIO = DataIO(base_folder_path)
@@ -55,7 +55,7 @@ def train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name,
                                similarity_type_list=similarity_type_list)
 
 
-def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_starts=15, similarity_type_list=['cosine'],
+def baseline_random(data_loader: DataLoader, ICM_name, percentages, seed, n_cases=50, n_random_starts=15, similarity_type_list=['cosine'],
                    parallelize=True):
     ##################################################
     # Data loading and splitting
@@ -104,9 +104,10 @@ def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_start
     N = float(ICM_coo.shape[0])
 
     # Compute IDF
-    IDF = np.log(N / (1 + np.bincount(ICM_coo.col)))
-    IDF_argsort = np.argsort(-IDF)
-    IDF_time = time.time() - IDF_time
+    # IDF = np.log(N / (1 + np.bincount(ICM_coo.col)))
+    # IDF_argsort = np.argsort(-IDF)
+    # IDF_time = time.time() - IDF_time
+    random = np.random.RandomState(seed=seed).permutation(ICM_train.shape[1])
 
     timings = {
         'IDF_time': IDF_time,
@@ -114,26 +115,25 @@ def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_start
 
     statistics = {
         'n_features': n_features,
-        'IDF': IDF,
-        'IDF_argsort': IDF_argsort,
+        'random': random,
     }
 
-    TFIDF_folder_path = f"../../results/{dataset_name}/{ICM_name}/TFIDF/"
-    dataIO = DataIO(TFIDF_folder_path)
-    dataIO.save_data("timings", timings)
-    dataIO.save_data("statistics", statistics)
+    random_folder_path = f"../../results/{dataset_name}/{ICM_name}/random_s{seed}/"
+    dataIO = DataIO(random_folder_path)
+    dataIO.save_data(f"timings_s{seed}", timings)
+    dataIO.save_data(f"statistics_s{seed}", statistics)
 
-    percentages = [5, 20, 40, 60, 80, 95]
+    # percentages = [20, 40, 60, 80, 95]
 
     if parallelize:
-        args = [(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation, evaluator_test,
+        args = [(n_features, percentage, random, dataset_name, ICM_name, evaluator_validation, evaluator_test,
                  URM_train, URM_train_last_test, ICM_train, original_ICM_train, n_cases, n_random_starts,
-                 similarity_type_list)
+                 similarity_type_list, seed)
                 for percentage in percentages]
-        parallelize_function(train_TFIDF_KNN, args, count_div=1, count_sub=0)
+        parallelize_function(train_random_KNN, args, count_div=1, count_sub=0)
 
     else:
         for percentage in percentages:
-            train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation,
+            train_random_KNN(n_features, percentage, random, dataset_name, ICM_name, evaluator_validation,
                             evaluator_test, URM_train, URM_train_last_test, ICM_train, original_ICM_train, n_cases,
-                            n_random_starts, similarity_type_list)
+                            n_random_starts, similarity_type_list, seed)

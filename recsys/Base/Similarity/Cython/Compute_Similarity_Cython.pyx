@@ -600,8 +600,12 @@ cdef class Compute_Similarity_Cython:
             rows = np.array(rows[0:sparse_data_pointer])
             cols = np.array(cols[0:sparse_data_pointer])
 
+            t = -time.time()
+            print("Building sparse matrix")
             W_sparse = sps.csr_matrix((values, (rows, cols)),
                                     shape=(self.n_columns, self.n_columns),
                                     dtype=np.float32)
+            t += time.time()
+            print("Building sparse matrix took %.1f minutes" % (t / 60))
 
             return W_sparse

@@ -8,6 +8,8 @@ Created on 14/12/18
 
 from skopt import gp_minimize
 from skopt.space import Real, Integer, Categorical
+import threading
+import time
 
 from recsys.ParameterTuning.SearchAbstractClass import SearchAbstractClass
 import traceback
@@ -49,13 +51,14 @@ class SearchBayesianSkopt(SearchAbstractClass):
         https://scikit-optimize.github.io/#skopt.gp_minimize
 
         """
+	
         self.n_point = n_points
         self.n_calls = n_calls
         self.n_random_starts = n_random_starts
         self.n_jobs = n_jobs
         self.acq_func = acq_func
         self.acq_optimizer = acq_optimizer
-        self.random_state = random_state
+        self.random_state = random_state or (hash((threading.get_ident(), time.time())) % (2**32))
         self.n_restarts_optimizer = n_restarts_optimizer
         self.verbose = verbose
         self.xi = xi
