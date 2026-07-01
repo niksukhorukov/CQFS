@@ -43,6 +43,8 @@ class Compute_Similarity:
         assert np.all(np.isfinite(dataMatrix.data)), \
             "Compute_Similarity: Data matrix contains {} non finite values".format(np.sum(np.logical_not(np.isfinite(dataMatrix.data))))
 
+        similarity_cache = args.pop("_similarity_cache", None)
+
         self.dense = False
 
         if similarity == "euclidean":
@@ -58,6 +60,34 @@ class Compute_Similarity:
 
             if similarity is not None:
                 args["similarity"] = similarity
+
+            if similarity_cache is not None and args.get("topK", 100) != 0 and args.get("row_weights", None) is None:
+                similarity_for_cache = args.get("similarity", "cosine")
+
+                try:
+                    from recsys.Base.Similarity.SimilarityComputationCache import Compute_Similarity_Cached
+
+                    cached_similarity_data = similarity_cache.get_similarity_data(
+                        dataMatrix,
+                        similarity=similarity_for_cache,
+                        row_weights=args.get("row_weights", None),
+                    )
+
+                    if cached_similarity_data is not None:
+                        self.compute_similarity_object = Compute_Similarity_Cached(
+                            cached_similarity_data,
+                            topK=args.get("topK", 100),
+                            shrink=args.get("shrink", 0),
+                            normalize=args.get("normalize", True),
+                            asymmetric_alpha=args.get("asymmetric_alpha", 0.5),
+                            tversky_alpha=args.get("tversky_alpha", 1.0),
+                            tversky_beta=args.get("tversky_beta", 1.0),
+                            similarity=similarity_for_cache,
+                        )
+                        return
+
+                except Exception:
+                    print("Compute_Similarity: cached implementation unavailable, reverting to default")
 
 
             if use_implementation == "density":
@@ -113,4 +143,3 @@ class Compute_Similarity:
     def compute_similarity(self,  **args):
 
         return self.compute_similarity_object.compute_similarity(**args)
-

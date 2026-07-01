@@ -1,11 +1,21 @@
-from data.DataLoader import TheMoviesDatasetLoader
-from experiments.baseline_CBF import baseline_CBF
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from experiments.runtime_options import parse_runtime_options, print_runtime_options, runtime_kwargs
 
 
 def main():
+    args = parse_runtime_options("Run TheMoviesDataset CBF baseline.")
+    print_runtime_options(args)
+
+    from data.DataLoader import TheMoviesDatasetLoader
+    from experiments.baseline_CBF import baseline_CBF
+
     data_loader = TheMoviesDatasetLoader()
     ICM_name = 'ICM_metadata'
-    baseline_CBF(data_loader, ICM_name)
+    baseline_CBF(data_loader, ICM_name, **runtime_kwargs(args))
 
 
 if __name__ == "__main__":

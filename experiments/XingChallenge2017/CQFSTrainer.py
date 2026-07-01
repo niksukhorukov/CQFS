@@ -1,14 +1,23 @@
-from data.DataLoader import XingChallenge2017Loader
-from experiments.train_CQFS import train_CQFS
-from recsys.Recommender_import_list import ItemKNNCFRecommender, PureSVDItemRecommender, \
-    RP3betaRecommender
+import os
+import sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dwave.system import DWaveSampler
-# from neal import SimulatedAnnealingSampler
+from experiments.runtime_options import parse_runtime_options, print_runtime_options, runtime_kwargs
 
 
 def main():
+    args = parse_runtime_options("Train XingChallenge2017 CQFS recommenders.")
+    print_runtime_options(args)
+
+    from data.DataLoader import XingChallenge2017Loader
+    from experiments.train_CQFS import train_CQFS
+    from recsys.Recommender_import_list import ItemKNNCFRecommender, PureSVDItemRecommender, \
+        RP3betaRecommender
+
+    from dwave.system import DWaveSampler
+    # from neal import SimulatedAnnealingSampler
+
     data_loader = XingChallenge2017Loader()
     ICM_name = 'ICM_all'
 
@@ -26,7 +35,8 @@ def main():
     cpu_count_sub = 0
 
     train_CQFS(data_loader, ICM_name, percentages, alphas, betas, combination_strengths, solver_class,
-               CF_recommender_classes, cpu_count_div=cpu_count_div, cpu_count_sub=cpu_count_sub)
+               CF_recommender_classes, cpu_count_div=cpu_count_div, cpu_count_sub=cpu_count_sub,
+               **runtime_kwargs(args))
 
 
 if __name__ == '__main__':

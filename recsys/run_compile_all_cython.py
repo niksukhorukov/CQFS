@@ -7,10 +7,20 @@ Created on 30/03/2019
 """
 
 import sys, glob, traceback, os
+
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from recsys.CythonCompiler.run_compile_subprocess import run_compile_subprocess
 
 
 if __name__ == '__main__':
+
+    os.chdir(SCRIPT_DIR)
 
     subfolder_to_compile_list = [
         "MatrixFactorization",

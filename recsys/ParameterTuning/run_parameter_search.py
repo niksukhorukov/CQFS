@@ -176,7 +176,8 @@ def runParameterSearch_Hybrid(recommender_class, URM_train, ICM_object, ICM_name
                                                        output_file_name_root = output_file_name_root,
                                                        metric_to_optimize = metric_to_optimize,
                                                        allow_weighting = allow_weighting,
-                                                       recommender_input_args_last_test = recommender_input_args_last_test)
+                                                       recommender_input_args_last_test = recommender_input_args_last_test,
+                                                       enable_similarity_cache = False)
 
 
 
@@ -218,9 +219,27 @@ def run_KNNRecommender_on_similarity_type(similarity_type, parameterSearch,
                                           output_file_name_root,
                                           metric_to_optimize,
                                           allow_weighting = False,
-                                          recommender_input_args_last_test = None):
+                                          recommender_input_args_last_test = None,
+                                          enable_similarity_cache = False,
+                                          similarity_cache_memory_mb = 2048):
 
     original_parameter_search_space = parameter_search_space
+
+    if enable_similarity_cache:
+        try:
+            from recsys.Base.Similarity.SimilarityComputationCache import SimilarityComputationCache
+
+            recommender_input_args = recommender_input_args.copy()
+            recommender_input_args.FIT_KEYWORD_ARGS = recommender_input_args.FIT_KEYWORD_ARGS.copy()
+            recommender_input_args.FIT_KEYWORD_ARGS["_similarity_cache"] = SimilarityComputationCache(
+                max_memory_bytes=int(similarity_cache_memory_mb) * 1024 ** 2,
+                verbose=False,
+            )
+
+        except ImportError as exc:
+            print("run_KNNRecommender_on_similarity_type: similarity cache unavailable ({}), running uncached".format(
+                exc
+            ))
 
     hyperparameters_range_dictionary = {}
     hyperparameters_range_dictionary["topK"] = Integer(5, 1000)
@@ -274,7 +293,8 @@ def runParameterSearch_Content(recommender_class, URM_train, ICM_object, ICM_nam
                                save_model = "best", evaluate_on_test = "best",
                                evaluator_validation= None, evaluator_test=None, metric_to_optimize = "PRECISION",
                                output_folder_path ="result_experiments/", parallelizeKNN = False, allow_weighting = True,
-                               similarity_type_list = None):
+                               similarity_type_list = None, enable_similarity_cache = True,
+                               similarity_cache_memory_mb = 2048):
     """
     This function performs the hyperparameter optimization for a content-based recommender
 
@@ -295,6 +315,8 @@ def runParameterSearch_Content(recommender_class, URM_train, ICM_object, ICM_nam
     :param parallelizeKNN:      Boolean value, if True the various heuristics of the KNNs will be computed in parallel, if False sequentially
     :param allow_weighting:     Boolean value, if True it enables the use of TF-IDF and BM25 to weight features, users and items in KNNs
     :param similarity_type_list: List of strings with the similarity heuristics to be used for the KNNs
+    :param enable_similarity_cache: Boolean value, if True reuses raw KNN similarity co-occurrences when possible
+    :param similarity_cache_memory_mb: Per-process memory budget for cached raw KNN similarities
     """
 
 
@@ -357,7 +379,9 @@ def runParameterSearch_Content(recommender_class, URM_train, ICM_object, ICM_nam
                                                    output_file_name_root = output_file_name_root,
                                                    metric_to_optimize = metric_to_optimize,
                                                    allow_weighting = allow_weighting,
-                                                   recommender_input_args_last_test = recommender_input_args_last_test)
+                                                   recommender_input_args_last_test = recommender_input_args_last_test,
+                                                   enable_similarity_cache = enable_similarity_cache,
+                                                   similarity_cache_memory_mb = similarity_cache_memory_mb)
 
 
 
@@ -386,7 +410,8 @@ def runParameterSearch_Collaborative(recommender_class, URM_train, URM_train_las
                                      evaluator_validation = None, evaluator_test = None, evaluator_validation_earlystopping = None,
                                      metric_to_optimize = "PRECISION",
                                      output_folder_path ="result_experiments/", parallelizeKNN = True,
-                                     allow_weighting = True, similarity_type_list = None):
+                                     allow_weighting = True, similarity_type_list = None, enable_similarity_cache = True,
+                                     similarity_cache_memory_mb = 2048):
     """
     This function performs the hyperparameter optimization for a collaborative recommender
 
@@ -406,6 +431,8 @@ def runParameterSearch_Collaborative(recommender_class, URM_train, URM_train_las
     :param parallelizeKNN:      Boolean value, if True the various heuristics of the KNNs will be computed in parallel, if False sequentially
     :param allow_weighting:     Boolean value, if True it enables the use of TF-IDF and BM25 to weight features, users and items in KNNs
     :param similarity_type_list: List of strings with the similarity heuristics to be used for the KNNs
+    :param enable_similarity_cache: Boolean value, if True reuses raw KNN similarity co-occurrences when possible
+    :param similarity_cache_memory_mb: Per-process memory budget for cached raw KNN similarities
     """
 
 
@@ -508,7 +535,9 @@ def runParameterSearch_Collaborative(recommender_class, URM_train, URM_train_las
                                                            output_file_name_root = output_file_name_root,
                                                            metric_to_optimize = metric_to_optimize,
                                                            allow_weighting = allow_weighting,
-                                                           recommender_input_args_last_test = recommender_input_args_last_test)
+                                                           recommender_input_args_last_test = recommender_input_args_last_test,
+                                                           enable_similarity_cache = enable_similarity_cache,
+                                                           similarity_cache_memory_mb = similarity_cache_memory_mb)
 
 
 
@@ -955,8 +984,4 @@ def runParameterSearch_FeatureWeighting(recommender_class, URM_train, W_train, I
                            output_file_name_root = output_file_name_root,
                            metric_to_optimize = metric_to_optimize,
                            recommender_input_args_last_test=recommender_input_args_last_test)
-
-
-
-
 

@@ -60,7 +60,7 @@ active environment. The code has been developed for Linux and Windows platforms.
 warnings.
 
 ```bash
-python run_compile_all_cython.py
+python recsys/run_compile_all_cython.py
 ```
 
 ## D-Wave Setup
@@ -90,99 +90,176 @@ dwave ping
 
 ## Running CQFS Experiments
 
-First of all, you need to prepare the original files for the datasets.
+Run the following commands from the repository root unless stated otherwise.
 
-For The Movies Dataset you need to download
-[The Movies Dataset from Kaggle](https://www.kaggle.com/rounakbanik/the-movies-dataset) and place the compressed files
-in the directory `recsys/Data_manager_offline_datasets/TheMoviesDataset/`, making sure the file is called
-`the-movies-dataset.zip`.
+### 1. Prepare Datasets
 
-For CiteULike_a you need to download
-[the following .zip file](https://polimi365-my.sharepoint.com/:u:/g/personal/10322330_polimi_it/EcjHpkI8TQdHnFVwVMkNGN4BmNkurMWw79sU8kpt4wk8eA?e=QYhdbz)
-and place it in the directory `recsys/Data_manager_offline_datasets/CiteULike/`, making sure the file is called
-`CiteULike_a_t.zip`.
+First, place the original dataset archives in the expected offline-data directories:
 
-We cannot provide data for Xing Challenge 2017, but if you have the dataset available, place the compressed file
-containing the dataset's original files in the directory `recsys/Data_manager_offline_datasets/XingChallenge2017/`,
-making sure the file is called `xing_challenge_data_2017.zip`.
+| Dataset | Expected file |
+| --- | --- |
+| The Movies Dataset | `recsys/Data_manager_offline_datasets/TheMoviesDataset/the-movies-dataset.zip` |
+| CiteULike_a | `recsys/Data_manager_offline_datasets/CiteULike/CiteULike_a_t.zip` |
+| Xing Challenge 2017 | `recsys/Data_manager_offline_datasets/XingChallenge2017/xing_challenge_data_2017.zip` |
 
-After preparing the datasets, you should run the following command under the `data` directory:
+For The Movies Dataset, download
+[The Movies Dataset from Kaggle](https://www.kaggle.com/rounakbanik/the-movies-dataset). For CiteULike_a, download
+[this archive](https://polimi365-my.sharepoint.com/:u:/g/personal/10322330_polimi_it/EcjHpkI8TQdHnFVwVMkNGN4BmNkurMWw79sU8kpt4wk8eA?e=QYhdbz).
+Xing Challenge 2017 data cannot be redistributed here.
 
-
-```bash
-python split_NameOfTheDataset.py
-```
-
-This python script will generate the data splits used in the experiments. Moreover, it will preprocess the dataset and
-check for any error in the preprocessing phase. The resulting splits are saved in the
-`recsys/Data_manager_split_datasets` directory.
-
-After splitting the dataset, you can actually run the experiments. All the experiment scripts are in the `experiments`
-directory, so enter this folder first.
-Each dataset has separated experiment scripts that you can find in the corresponding directories.
-From now on, we will assume that you are running the following commands in the dataset-specific folders, thus running
-the scripts contained there.
-
-### Collaborative models
-
-First of all, we need to optimize the chosen collaborative models to use with CQFS. To do so, run the following command:
+Generate the preprocessed splits with the matching split script:
 
 ```bash
-python CollaborativeFiltering.py
+python data/split_CiteULike_a.py
+python data/split_TheMoviesDataset.py
+python data/split_XingChallenge2017.py
 ```
 
-The resulting models will be saved into the `results` directory.
+The split scripts write under `recsys/Data_manager_split_datasets/`.
 
-### CQFS
+### 2. Compile Cython
 
-Then, you can run the CQFS procedure. We divided the procedure into a _selection_ phase and a _recommendation_ phase. To
-perform the selection through CQFS run the following command:
+Many recommenders and the cached similarity scorer require compiled Cython extensions. Recompile after changing Cython
+files or after creating a fresh environment:
 
 ```bash
-python CQFS.py
+python recsys/run_compile_all_cython.py
 ```
 
-This script will solve the CQFS problem on the corresponding dataset and save all the selected features in appropriate
-subdirectories under the `results` directory.
+### 3. Runtime Performance Flags
 
-After solving the feature selection problem, you should run the following command:
+The experiment scripts expose the same validation and KNN-cache controls:
 
 ```bash
-python CQFSTrainer.py
+--fast-validation-evaluator
+--no-fast-validation-evaluator
+--similarity-cache
+--no-similarity-cache
+--similarity-cache-memory-mb 2048
 ```
 
-This script will optimize an ItemKNN content-based recommender system for each selection corresponding to the given
-hyperparameters (and previously obtained through CQFS), using only the selected features. Again, all the results are
-saved in the corresponding subdirectories under the `results` directory.
+Defaults:
 
-> NOTE: Each selection with D-Wave Leap hybrid service on these problems is performed in around 8 seconds for The Movies
-> Dataset and around 30 for CiteULike_a.
-> Therefore, running the script as it is would result in consuming all the free time given with the developer plan on
-> D-Wave Leap and may result in errors or invalid selections when there's no free time remaining.
->
-> We suggest to reduce the number of hyperparameters passed when running the experiments or, even better, chose a
-> collaborative model and perform all the experiments on it.
->
-> This is not the case when running experiments with Simulated Annealing, since it is executed locally.
-> 
-> For Xing Challenge 2017 experiments run directly on the D-Wave QPU.
-> Leaving all the hyperparameters unchanged, all the experiments should not exceed the free time of the developer plan.
-> Pay attention when increasing the number of reads from the sampler or the annealing time.
+- `--fast-validation-evaluator` is enabled by default for validation/search.
+- `--similarity-cache` is enabled by default for KNN content/collaborative searches.
+- Test/final evaluation still uses the original full `EvaluatorHoldout`.
+- `baseline_CFW.py` exposes only the fast-evaluator flag because it does not use the KNN similarity-cache path.
+- The cache memory budget is per process. Parallel runs can use roughly `process_count * similarity_cache_memory_mb`.
 
-### Baselines
-
-In order to obtain the baseline evaluations you can run the corresponding scripts with the following commands:
+Use `--help` on any dataset runner to see the exact options:
 
 ```bash
-# ItemKNN content-based with all the features
-python baseline_CBF.py
-
-# ItemKNN content-based with features selected through TF-IDF
-python baseline_TFIDF.py
-
-# CFeCBF feature weighting baseline
-python baseline_CFW.py
+python experiments/CiteULike_a/CollaborativeFiltering.py --help
+python experiments/CiteULike_a/CQFSTrainer.py --help
+python experiments/CiteULike_a/baseline_CFW.py --help
 ```
+
+For very large matrices, for example `100000 x 100000`, start with an explicit memory budget and disable cache if the
+raw co-occurrence matrix is too large for the machine:
+
+```bash
+python experiments/CiteULike_a/CollaborativeFiltering.py --similarity-cache-memory-mb 8192
+python experiments/CiteULike_a/CollaborativeFiltering.py --no-similarity-cache
+```
+
+If the cache budget is exceeded, the code falls back to the normal Cython similarity computation for that matrix.
+
+### 4. Recommended Experiment Order
+
+Each dataset has its own scripts under `experiments/CiteULike_a/`, `experiments/TheMoviesDataset/`, and
+`experiments/XingChallenge2017/`. Replace `CiteULike_a` in the examples with another dataset folder as needed.
+
+First optimize collaborative recommenders. CQFS trainers load these saved CF hyperparameters:
+
+```bash
+python experiments/CiteULike_a/CollaborativeFiltering.py
+```
+
+Run the baselines:
+
+```bash
+# ItemKNN content-based with all features
+python experiments/CiteULike_a/baseline_CBF.py
+
+# ItemKNN content-based with TF-IDF feature selection
+python experiments/CiteULike_a/baseline_TFIDF.py
+
+# CFeCBF feature-weighting baseline
+python experiments/CiteULike_a/baseline_CFW.py
+```
+
+Run CQFS selection, then tune recommenders on the selected features:
+
+```bash
+python experiments/CiteULike_a/CQFS.py
+python experiments/CiteULike_a/CQFSTrainer.py
+```
+
+Run CQFSTT selection and training:
+
+```bash
+python experiments/CiteULike_a/CQFSTT.py
+python experiments/CiteULike_a/CQFSTTTrainer.py
+```
+
+Results are written under `results/`, grouped by dataset, ICM, recommender, and experiment id.
+
+### 5. Common Command Variants
+
+Use the default optimized validation/cache path:
+
+```bash
+python experiments/TheMoviesDataset/baseline_CBF.py
+```
+
+Compare against the original validation evaluator and uncached similarity computation:
+
+```bash
+python experiments/TheMoviesDataset/baseline_CBF.py --no-fast-validation-evaluator --no-similarity-cache
+```
+
+Use fast validation but disable matrix cache for a large or memory-constrained run:
+
+```bash
+python experiments/XingChallenge2017/CollaborativeFiltering.py --no-similarity-cache
+```
+
+Increase cache budget for repeated KNN searches on a matrix that fits in memory:
+
+```bash
+python experiments/CiteULike_a/CQFSTrainer.py --similarity-cache-memory-mb 8192
+```
+
+### 6. Benchmark And Correctness Checks
+
+Run focused correctness tests for the new evaluator and similarity cache:
+
+```bash
+python -m unittest recsys/Base/Evaluation/Evaluator_fast_test.py
+python -m unittest recsys/Base/Similarity/Compute_similarity_cache_test.py
+```
+
+Run the synthetic benchmark comparing original, cached, fast evaluator, and cached+fast paths:
+
+```bash
+python experiments/benchmark_cached_similarity_eval.py --profile both --n-trials 30 --cache-memory-mb 2048
+```
+
+For a quick smoke benchmark:
+
+```bash
+python experiments/benchmark_cached_similarity_eval.py --profile sparse --n-trials 3 --output ""
+```
+
+### 7. D-Wave Runtime Notes
+
+Each selection with D-Wave Leap hybrid service takes roughly 8 seconds for The Movies Dataset and roughly 30 seconds for
+CiteULike_a. Running the scripts with all default CQFS hyperparameters can consume most or all free D-Wave Leap time and
+may cause errors or invalid selections after the quota is exhausted.
+
+For D-Wave runs, consider reducing the CQFS hyperparameter grids in the dataset-specific scripts or running a single
+collaborative model first. This does not apply to local simulated annealing, which runs locally. Xing Challenge 2017
+experiments run directly on the D-Wave QPU, so be careful when increasing sampler reads or annealing time.
 
 ## Acknowledgements
 Software produced by Riccardo Nembrini.

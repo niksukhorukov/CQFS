@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 
 from recsys.Base.DataIO import DataIO
-from recsys.Base.Evaluation.Evaluator import EvaluatorHoldout
+from recsys.Base.Evaluation.Evaluator import EvaluatorHoldout, EvaluatorHoldoutFast
 from recsys.KNN.ItemKNNCBFRecommender import ItemKNNCBFRecommender
 from recsys.ParameterTuning.run_parameter_search import runParameterSearch_Content
 from utils.multithreading import parallelize_function
@@ -21,7 +21,8 @@ class CQFSTrainer:
     def __init__(self, CQFS, URM_train, URM_validation, URM_train_last_test, URM_test, ICM_train, ICM_train_last_test,
                  ICM_name, dataset_name, cf_recommender_name, cutoff_list_validation=None, cutoff_list_test=None,
                  ignore_items_validation=None, ignore_items_test=None, n_cases=N_CASES, n_random_starts=N_RAN_STARTS,
-                 similarity_type_list=None, parallelize=False):
+                 similarity_type_list=None, parallelize=False, use_fast_validation_evaluator=True,
+                 enable_similarity_cache=True, similarity_cache_memory_mb=2048):
         self.CQFS = CQFS
         self.selection_type = CQFS.selection_type
 
@@ -47,6 +48,9 @@ class CQFSTrainer:
         self.similarity_type_list = ['cosine'] if similarity_type_list is None else similarity_type_list
 
         self.parallelize = parallelize
+        self.use_fast_validation_evaluator = use_fast_validation_evaluator
+        self.enable_similarity_cache = enable_similarity_cache
+        self.similarity_cache_memory_mb = similarity_cache_memory_mb
 
         if not self.parallelize:
             self.evaluator_validation = self.__get_evaluator_validation()
@@ -57,8 +61,9 @@ class CQFSTrainer:
         print(f"CQFSTrainer: {msg}")
 
     def __get_evaluator_validation(self):
-        return EvaluatorHoldout(self.URM_validation, cutoff_list=self.cutoff_list_validation,
-                                ignore_items=self.ignore_items_validation)
+        evaluator_class = EvaluatorHoldoutFast if self.use_fast_validation_evaluator else EvaluatorHoldout
+        return evaluator_class(self.URM_validation, cutoff_list=self.cutoff_list_validation,
+                               ignore_items=self.ignore_items_validation)
 
     def __get_evaluator_test(self):
         return EvaluatorHoldout(self.URM_test, cutoff_list=self.cutoff_list_test, ignore_items=self.ignore_items_test)
@@ -86,7 +91,8 @@ class CQFSTrainer:
 
         train(expID, self.selection_type, self.evaluator_validation, self.evaluator_test, self.dataset_name,
               self.ICM_name, self.cf_recommender_name, selection, self.URM_train, self.URM_train_last_test,
-              self.ICM_train, self.ICM_train_last_test, self.n_cases, self.n_random_starts, self.similarity_type_list)
+              self.ICM_train, self.ICM_train_last_test, self.n_cases, self.n_random_starts, self.similarity_type_list,
+              self.enable_similarity_cache, self.similarity_cache_memory_mb)
 
     def __get_experiment_ids(self, ps, alphas, betas, combination_strengths, parameter_product=True):
 
@@ -120,7 +126,9 @@ class CQFSTrainer:
                 self.ICM_train_last_test,
                 self.n_cases,
                 self.n_random_starts,
-                self.similarity_type_list
+                self.similarity_type_list,
+                self.enable_similarity_cache,
+                self.similarity_cache_memory_mb
             ) for expID in expIDs]
             parallelize_function(train, args, count_div=cpu_count_div, count_sub=cpu_count_sub)
         else:
@@ -189,7 +197,7 @@ def _print_train_failed(expID):
 
 def train(expID, selection_type, evaluator_validation, evaluator_test, dataset_name, ICM_name, CF_recommender_name,
           selection, URM_train, URM_train_last_test, ICM_train, ICM_train_last_test, n_cases, n_random_starts,
-          similarity_type_list):
+          similarity_type_list, enable_similarity_cache=True, similarity_cache_memory_mb=2048):
     if selection is None:
         _print_train_failed(expID)
         return
@@ -210,6 +218,8 @@ def train(expID, selection_type, evaluator_validation, evaluator_test, dataset_n
                                evaluator_validation=evaluator_validation,
                                evaluator_test=evaluator_test,
                                output_folder_path=output_folder_path,
-                               similarity_type_list=similarity_type_list)
+                               similarity_type_list=similarity_type_list,
+                               enable_similarity_cache=enable_similarity_cache,
+                               similarity_cache_memory_mb=similarity_cache_memory_mb)
 
     __print(f"[{expID}] Parameter tuning ended.")

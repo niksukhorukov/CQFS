@@ -13,7 +13,7 @@ import time, sys, copy
 from enum import Enum
 from recsys.Utils.seconds_to_biggest_unit import seconds_to_biggest_unit
 
-from recsys.Base.Evaluation.metrics import roc_auc, precision, precision_recall_min_denominator, recall, MAP, MRR, ndcg, arhr, \
+from recsys.Base.Evaluation.metrics import roc_auc, precision, precision_recall_min_denominator, recall, average_precision, rr, MAP, MRR, ndcg, arhr, \
     Novelty, Coverage_Item, Coverage_Test_Correct, _Metrics_Object, Coverage_User, Coverage_User_Correct, Gini_Diversity, Shannon_Entropy, Diversity_MeanInterList,\
     Diversity_Herfindahl, AveragePopularity, Ratio_Diversity_Gini, Ratio_Diversity_Herfindahl, Ratio_Shannon_Entropy, Ratio_AveragePopularity, Ratio_Novelty
 
@@ -488,6 +488,179 @@ class EvaluatorHoldout(Evaluator):
 
 
 
+class EvaluatorHoldoutFast(Evaluator):
+    """EvaluatorHoldout optimized for validation/search accuracy metrics."""
+
+    EVALUATOR_NAME = "EvaluatorHoldoutFast"
+
+    SUPPORTED_METRICS = [
+        EvaluatorMetrics.ROC_AUC.value,
+        EvaluatorMetrics.PRECISION.value,
+        EvaluatorMetrics.PRECISION_RECALL_MIN_DEN.value,
+        EvaluatorMetrics.RECALL.value,
+        EvaluatorMetrics.MAP.value,
+        EvaluatorMetrics.MRR.value,
+        EvaluatorMetrics.NDCG.value,
+        EvaluatorMetrics.F1.value,
+        EvaluatorMetrics.HIT_RATE.value,
+        EvaluatorMetrics.ARHR.value,
+    ]
+
+    def __init__(self, URM_test_list, cutoff_list, min_ratings_per_user=1, exclude_seen=True,
+                 diversity_object=None,
+                 ignore_items=None,
+                 ignore_users=None,
+                 verbose=True,
+                 metrics_to_compute=None):
+
+        super(EvaluatorHoldoutFast, self).__init__(URM_test_list, cutoff_list,
+                                                   diversity_object=diversity_object,
+                                                   min_ratings_per_user=min_ratings_per_user,
+                                                   exclude_seen=exclude_seen,
+                                                   ignore_items=ignore_items,
+                                                   ignore_users=ignore_users,
+                                                   verbose=verbose)
+
+        if metrics_to_compute is None:
+            metrics_to_compute = self.SUPPORTED_METRICS
+
+        metrics_to_compute = [self._normalize_metric_name(metric) for metric in metrics_to_compute]
+
+        unsupported_metrics = set(metrics_to_compute) - set(self.SUPPORTED_METRICS)
+        if len(unsupported_metrics) > 0:
+            raise ValueError("{} supports only metrics {}, requested {}".format(
+                self.EVALUATOR_NAME,
+                self.SUPPORTED_METRICS,
+                sorted(unsupported_metrics),
+            ))
+
+        if EvaluatorMetrics.F1.value in metrics_to_compute:
+            if EvaluatorMetrics.PRECISION.value not in metrics_to_compute:
+                metrics_to_compute.append(EvaluatorMetrics.PRECISION.value)
+            if EvaluatorMetrics.RECALL.value not in metrics_to_compute:
+                metrics_to_compute.append(EvaluatorMetrics.RECALL.value)
+
+        self.metrics_to_compute = metrics_to_compute
+        self.metrics_to_compute_set = set(metrics_to_compute)
+
+    def _normalize_metric_name(self, metric):
+        if isinstance(metric, EvaluatorMetrics):
+            return metric.value
+
+        return str(metric)
+
+    def _create_empty_fast_metrics_dict(self):
+        results_dict = {}
+
+        for cutoff in self.cutoff_list:
+            results_dict[cutoff] = {}
+
+            for metric in self.metrics_to_compute:
+                results_dict[cutoff][metric] = 0.0
+
+        return results_dict
+
+    def _run_evaluation_on_selected_users(self, recommender_object, users_to_evaluate, block_size=None):
+
+        if block_size is None:
+            block_size = min(1000, int(1e8/self.n_items))
+            block_size = min(block_size, len(users_to_evaluate))
+
+        results_dict = self._create_empty_fast_metrics_dict()
+
+        user_batch_start = 0
+        user_batch_end = 0
+
+        while user_batch_start < len(users_to_evaluate):
+
+            user_batch_end = user_batch_start + block_size
+            user_batch_end = min(user_batch_end, len(users_to_evaluate))
+
+            test_user_batch_array = np.array(users_to_evaluate[user_batch_start:user_batch_end])
+            user_batch_start = user_batch_end
+
+            recommended_items_batch_array = recommender_object.recommend_batch_array(
+                test_user_batch_array,
+                remove_seen_flag=self.exclude_seen,
+                cutoff=self.max_cutoff,
+                remove_top_pop_flag=False,
+                remove_custom_items_flag=self.ignore_items_flag,
+            )
+
+            for batch_user_index in range(recommended_items_batch_array.shape[0]):
+
+                test_user = test_user_batch_array[batch_user_index]
+                start_position = self.URM_test.indptr[test_user]
+                end_position = self.URM_test.indptr[test_user + 1]
+
+                relevant_items = self.URM_test.indices[start_position:end_position]
+                relevant_ratings = self.URM_test.data[start_position:end_position]
+
+                recommended_items = recommended_items_batch_array[batch_user_index]
+                recommended_items = recommended_items[recommended_items >= 0]
+
+                is_relevant = np.in1d(recommended_items, relevant_items, assume_unique=True)
+
+                self._n_users_evaluated += 1
+
+                for cutoff in self.cutoff_list:
+
+                    results_current_cutoff = results_dict[cutoff]
+
+                    is_relevant_current_cutoff = is_relevant[0:cutoff]
+                    recommended_items_current_cutoff = recommended_items[0:cutoff]
+
+                    if EvaluatorMetrics.ROC_AUC.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.ROC_AUC.value] += roc_auc(is_relevant_current_cutoff)
+
+                    if EvaluatorMetrics.PRECISION.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.PRECISION.value] += precision(is_relevant_current_cutoff)
+
+                    if EvaluatorMetrics.PRECISION_RECALL_MIN_DEN.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.PRECISION_RECALL_MIN_DEN.value] += \
+                            precision_recall_min_denominator(is_relevant_current_cutoff, len(relevant_items))
+
+                    if EvaluatorMetrics.RECALL.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.RECALL.value] += \
+                            recall(is_relevant_current_cutoff, relevant_items)
+
+                    if EvaluatorMetrics.NDCG.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.NDCG.value] += \
+                            ndcg(recommended_items_current_cutoff, relevant_items, relevance=relevant_ratings, at=cutoff)
+
+                    if EvaluatorMetrics.HIT_RATE.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.HIT_RATE.value] += is_relevant_current_cutoff.sum()
+
+                    if EvaluatorMetrics.ARHR.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.ARHR.value] += arhr(is_relevant_current_cutoff)
+
+                    if EvaluatorMetrics.MRR.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.MRR.value] += rr(is_relevant_current_cutoff)
+
+                    if EvaluatorMetrics.MAP.value in self.metrics_to_compute_set:
+                        results_current_cutoff[EvaluatorMetrics.MAP.value] += \
+                            average_precision(is_relevant_current_cutoff, relevant_items)
+
+            if time.time() - self._start_time_print > 30 or self._n_users_evaluated == len(self.users_to_evaluate):
+
+                elapsed_time = time.time() - self._start_time
+                new_time_value, new_time_unit = seconds_to_biggest_unit(elapsed_time)
+
+                self._print("Processed {} ({:4.1f}%) in {:.2f} {}. Users per second: {:.0f}".format(
+                    self._n_users_evaluated,
+                    100.0 * float(self._n_users_evaluated) / len(self.users_to_evaluate),
+                    new_time_value,
+                    new_time_unit,
+                    float(self._n_users_evaluated) / elapsed_time))
+
+                sys.stdout.flush()
+                sys.stderr.flush()
+
+                self._start_time_print = time.time()
+
+        return results_dict
+
+
 
 class EvaluatorNegativeItemSample(Evaluator):
     """EvaluatorNegativeItemSample"""
@@ -574,4 +747,3 @@ class EvaluatorNegativeItemSample(Evaluator):
 
 
         return results_dict
-

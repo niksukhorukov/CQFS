@@ -1,13 +1,16 @@
 import numpy as np
 
 from data.DataLoader import DataLoader
+from experiments.runtime_options import make_validation_evaluator
 from recsys.Base.Evaluation.Evaluator import EvaluatorHoldout
 from recsys.KNN.ItemKNNCBFRecommender import ItemKNNCBFRecommender
 from recsys.ParameterTuning.run_parameter_search import runParameterSearch_Content
 from utils.sparse import merge_sparse_matrices
 
 
-def baseline_CBF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_starts=15, similarity_type_list=['cosine']):
+def baseline_CBF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_starts=15,
+                 similarity_type_list=['cosine'], use_fast_validation_evaluator=True,
+                 enable_similarity_cache=True, similarity_cache_memory_mb=2048):
     ##################################################
     # Data loading and splitting
 
@@ -42,7 +45,12 @@ def baseline_CBF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_starts=
 
     # Create the evaluator objects for validation and test
     # Train items are ignored during validation; train and validation items are ignored during testing
-    evaluator_validation = EvaluatorHoldout(URM_validation, cutoff_list=[10], ignore_items=train_warm_item_mask)
+    evaluator_validation = make_validation_evaluator(
+        URM_validation,
+        cutoff_list=[10],
+        ignore_items=train_warm_item_mask,
+        use_fast_validation_evaluator=use_fast_validation_evaluator,
+    )
     evaluator_test = EvaluatorHoldout(URM_test, cutoff_list=[5, 10, 20, 50],
                                       ignore_items=train_validation_warm_item_mask)
 
@@ -56,4 +64,6 @@ def baseline_CBF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_starts=
                                n_cases=n_cases, n_random_starts=n_random_starts, resume_from_saved=True,
                                save_model='best', evaluator_validation=evaluator_validation,
                                evaluator_test=evaluator_test, output_folder_path=output_folder_path,
-                               similarity_type_list=similarity_type_list)
+                               similarity_type_list=similarity_type_list,
+                               enable_similarity_cache=enable_similarity_cache,
+                               similarity_cache_memory_mb=similarity_cache_memory_mb)

@@ -3,6 +3,7 @@ import time
 import numpy as np
 
 from data.DataLoader import DataLoader
+from experiments.runtime_options import make_validation_evaluator
 from recsys.Base.DataIO import DataIO
 from recsys.Base.Evaluation.Evaluator import EvaluatorHoldout
 from recsys.KNN.ItemKNNCBFRecommender import ItemKNNCBFRecommender
@@ -14,7 +15,7 @@ from utils.sparse import select_columns, merge_sparse_matrices
 
 def train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation, evaluator_test,
                     URM_train, URM_train_last_test, ICM_train, ICM_train_last_test, n_cases, n_random_starts,
-                    similarity_type_list):
+                    similarity_type_list, enable_similarity_cache=True, similarity_cache_memory_mb=2048):
     selection_time = time.time()
     k_features = round(n_features * percentage / 100)
     selection = IDF_argsort[:k_features]
@@ -52,11 +53,14 @@ def train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name,
                                n_cases=n_cases, n_random_starts=n_random_starts, resume_from_saved=True,
                                save_model='best', evaluator_validation=evaluator_validation,
                                evaluator_test=evaluator_test, output_folder_path=recommender_folder_path,
-                               similarity_type_list=similarity_type_list)
+                               similarity_type_list=similarity_type_list,
+                               enable_similarity_cache=enable_similarity_cache,
+                               similarity_cache_memory_mb=similarity_cache_memory_mb)
 
 
 def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_starts=15, similarity_type_list=['cosine'],
-                   parallelize=True):
+                   parallelize=True, use_fast_validation_evaluator=True, enable_similarity_cache=True,
+                   similarity_cache_memory_mb=2048):
     ##################################################
     # Data loading and splitting
 
@@ -91,7 +95,12 @@ def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_start
 
     # Create the evaluator objects for validation and test
     # Train items are ignored during validation; train and validation items are ignored during testing
-    evaluator_validation = EvaluatorHoldout(URM_validation, cutoff_list=[10], ignore_items=train_warm_item_mask)
+    evaluator_validation = make_validation_evaluator(
+        URM_validation,
+        cutoff_list=[10],
+        ignore_items=train_warm_item_mask,
+        use_fast_validation_evaluator=use_fast_validation_evaluator,
+    )
     evaluator_test = EvaluatorHoldout(URM_test, cutoff_list=[5, 10, 20, 50],
                                       ignore_items=train_validation_warm_item_mask)
 
@@ -128,7 +137,7 @@ def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_start
     if parallelize:
         args = [(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation, evaluator_test,
                  URM_train, URM_train_last_test, ICM_train, original_ICM_train, n_cases, n_random_starts,
-                 similarity_type_list)
+                 similarity_type_list, enable_similarity_cache, similarity_cache_memory_mb)
                 for percentage in percentages]
         parallelize_function(train_TFIDF_KNN, args, count_div=1, count_sub=0)
 
@@ -136,4 +145,4 @@ def baseline_TFIDF(data_loader: DataLoader, ICM_name, n_cases=50, n_random_start
         for percentage in percentages:
             train_TFIDF_KNN(n_features, percentage, IDF_argsort, dataset_name, ICM_name, evaluator_validation,
                             evaluator_test, URM_train, URM_train_last_test, ICM_train, original_ICM_train, n_cases,
-                            n_random_starts, similarity_type_list)
+                            n_random_starts, similarity_type_list, enable_similarity_cache, similarity_cache_memory_mb)

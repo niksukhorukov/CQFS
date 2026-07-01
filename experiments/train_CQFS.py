@@ -11,7 +11,9 @@ from utils.statistics import warm_similarity_statistics
 
 
 def train_CQFS(data_loader: DataLoader, ICM_name, percentages, alphas, betas, combination_strengths, solver_class,
-               CF_recommender_classes, parameter_product=True, cpu_count_div=2, cpu_count_sub=0):
+               CF_recommender_classes, parameter_product=True, cpu_count_div=2, cpu_count_sub=0,
+               use_fast_validation_evaluator=True, enable_similarity_cache=True,
+               similarity_cache_memory_mb=2048):
     N_CASES = 50
     N_RAN_STARTS = 15
     SIMILARITY_TYPE = 'cosine'
@@ -106,7 +108,10 @@ def train_CQFS(data_loader: DataLoader, ICM_name, percentages, alphas, betas, co
                                    ignore_items_validation=train_warm_item_mask,
                                    ignore_items_test=train_validation_warm_item_mask, n_cases=N_CASES,
                                    n_random_starts=N_RAN_STARTS, similarity_type_list=[SIMILARITY_TYPE],
-                                   parallelize=True)
+                                   parallelize=True,
+                                   use_fast_validation_evaluator=use_fast_validation_evaluator,
+                                   enable_similarity_cache=enable_similarity_cache,
+                                   similarity_cache_memory_mb=similarity_cache_memory_mb)
 
         CQFS_trainer.train_many(percentages, alphas, betas, combination_strengths, parameter_product=parameter_product,
                                 cpu_count_div=cpu_count_div, cpu_count_sub=cpu_count_sub)

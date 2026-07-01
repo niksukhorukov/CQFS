@@ -1,6 +1,7 @@
 import numpy as np
 
 from data.DataLoader import DataLoader
+from experiments.runtime_options import make_validation_evaluator
 from recsys.Base.DataIO import DataIO
 from recsys.Base.Evaluation.Evaluator import EvaluatorHoldout
 from recsys.FeatureWeighting.Cython.CFW_D_Similarity_Cython import CFW_D_Similarity_Cython, EvaluatorCFW_D_wrapper
@@ -22,7 +23,8 @@ def train_CFW(CFW_recommender, ICM_name, output_folder_path, W_train, evaluator_
                                         output_folder_path=output_folder_path)
 
 
-def baseline_CFW(data_loader: DataLoader, ICM_name, CF_recommenders, n_cases=50, n_random_starts=15, parallelize=True):
+def baseline_CFW(data_loader: DataLoader, ICM_name, CF_recommenders, n_cases=50, n_random_starts=15, parallelize=True,
+                 use_fast_validation_evaluator=True):
     ##################################################
     # Data loading and splitting
 
@@ -79,7 +81,12 @@ def baseline_CFW(data_loader: DataLoader, ICM_name, CF_recommenders, n_cases=50,
 
     # Create the evaluator objects for validation and test
     # Train items are ignored during validation; train and validation items are ignored during testing
-    evaluator_validation = EvaluatorHoldout(URM_validation, cutoff_list=[10], ignore_items=train_warm_item_mask)
+    evaluator_validation = make_validation_evaluator(
+        URM_validation,
+        cutoff_list=[10],
+        ignore_items=train_warm_item_mask,
+        use_fast_validation_evaluator=use_fast_validation_evaluator,
+    )
     evaluator_test = EvaluatorHoldout(URM_test, cutoff_list=[5, 10, 20, 50],
                                       ignore_items=train_validation_warm_item_mask)
 

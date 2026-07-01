@@ -1,12 +1,22 @@
-from core.CQFSTTSampler import CQFSTTSampler
-from data.DataLoader import TheMoviesDatasetLoader
-from experiments.train_CQFSTT import train_CQFSTT
-from recsys.Recommender_import_list import (
-    ItemKNNCFRecommender, PureSVDItemRecommender, RP3betaRecommender,
-)
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from experiments.runtime_options import parse_runtime_options, print_runtime_options, runtime_kwargs
 
 
 def main():
+    args = parse_runtime_options("Train TheMoviesDataset CQFSTT recommenders.")
+    print_runtime_options(args)
+
+    from core.CQFSTTSampler import CQFSTTSampler
+    from data.DataLoader import TheMoviesDatasetLoader
+    from experiments.train_CQFSTT import train_CQFSTT
+    from recsys.Recommender_import_list import (
+        ItemKNNCFRecommender, PureSVDItemRecommender, RP3betaRecommender,
+    )
+
     data_loader = TheMoviesDatasetLoader()
     ICM_name = 'ICM_metadata'
 
@@ -36,6 +46,7 @@ def main():
         sampler=sampler,
         parameter_product=parameter_product,
         parameter_per_recommender=parameter_per_recommender,
+        **runtime_kwargs(args)
     )
 
 

@@ -222,6 +222,50 @@ class BaseRecommender(object):
             return ranking_list
 
 
+    def recommend_batch_array(self, user_id_array, cutoff=None, remove_seen_flag=True, items_to_compute=None,
+                              remove_top_pop_flag=False, remove_custom_items_flag=False):
+        """
+        Return recommendations as a dense 2D array for batch evaluators.
+        Invalid entries filtered due to -inf scores are set to -1.
+        """
+
+        if np.isscalar(user_id_array):
+            user_id_array = np.atleast_1d(user_id_array)
+
+        if cutoff is None:
+            cutoff = self.URM_train.shape[1] - 1
+
+        scores_batch = self._compute_item_score(user_id_array, items_to_compute=items_to_compute)
+
+        for user_index in range(len(user_id_array)):
+
+            user_id = user_id_array[user_index]
+
+            if remove_seen_flag:
+                scores_batch[user_index, :] = self._remove_seen_on_scores(user_id, scores_batch[user_index, :])
+
+        if remove_top_pop_flag:
+            scores_batch = self._remove_TopPop_on_scores(scores_batch)
+
+        if remove_custom_items_flag:
+            scores_batch = self._remove_custom_items_on_scores(scores_batch)
+
+        relevant_items_partition = (-scores_batch).argpartition(cutoff, axis=1)[:, 0:cutoff]
+        relevant_items_partition_original_value = scores_batch[
+            np.arange(scores_batch.shape[0])[:, None], relevant_items_partition
+        ]
+        relevant_items_partition_sorting = np.argsort(-relevant_items_partition_original_value, axis=1)
+        ranking = relevant_items_partition[
+            np.arange(relevant_items_partition.shape[0])[:, None],
+            relevant_items_partition_sorting
+        ].astype(np.int64, copy=False)
+
+        ranking_scores = scores_batch[np.arange(scores_batch.shape[0])[:, None], ranking]
+        ranking[np.isinf(ranking_scores)] = -1
+
+        return ranking
+
+
 
     #########################################################################################################
     ##########                                                                                     ##########
