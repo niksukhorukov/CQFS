@@ -1,3 +1,11 @@
+import os
+import sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+sys.path.insert(0, PROJECT_ROOT)
+os.chdir(SCRIPT_DIR)
+
 from data.DataLoader import XingChallenge2017Loader
 from experiments.run_CQFS import run_CQFS
 from recsys.Recommender_import_list import ItemKNNCFRecommender, PureSVDItemRecommender, RP3betaRecommender
